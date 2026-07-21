@@ -11,6 +11,12 @@ gaussian-splatting/
 # Vocabulario COLMAP (~15MB, descargar de https://demuc.de/colmap/)
 vocab_tree.bin
 
+# Videos de entrada
+*.mov
+*.mp4
+*.avi
+*.mkv
+
 # Logs
 *.log
 
