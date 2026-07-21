@@ -1,6 +1,10 @@
 # dko-3dgs
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/lhidalgo42/3dgs/blob/main/dko_3dgs_colab.ipynb)
+
 Reconstrucción 3D de un recorrido (walkthrough en video) usando **3D Gaussian Splatting**.
+
+Para correr el pipeline completo en Google Colab (GPU T4, video desde Google Drive), abre [`dko_3dgs_colab.ipynb`](dko_3dgs_colab.ipynb) con el badge de arriba.
 
 Pipeline completo: video → selección de frames nítidos → SfM (COLMAP o hloc) → entrenamiento 3DGS.
 
