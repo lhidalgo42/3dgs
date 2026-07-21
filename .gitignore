@@ -1,0 +1,20 @@
+# Datos pesados: frames, reconstrucciones y modelos entrenados (no van al repo)
+candidates/
+candidates_seg/
+data/
+hloc_out/
+output/
+
+# Clon del repo de Inria (instalar aparte, ver README)
+gaussian-splatting/
+
+# Vocabulario COLMAP (~15MB, descargar de https://demuc.de/colmap/)
+vocab_tree.bin
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
