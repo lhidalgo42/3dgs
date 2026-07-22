@@ -1,8 +1,9 @@
-"""Continuación del pipeline: GLOMAP (mapper global) -> subset -> undistort -> 3DGS.
+"""Retriangulación completa del modelo GLOMAP + subset + undistort + 3DGS.
 
-Se lanza cuando hloc ya dejó lista la base de datos (features + matches +
-verificación geométrica) en hloc_out/sfm/database.db, en lugar del mapper
-incremental de pycolmap que tomaría días con ~24k imágenes.
+Reemplaza la retriangulación interna de GLOMAP (que crashea por el esquema
+de db migrado) por pycolmap.triangulate_points sobre la db ORIGINAL de
+esquema nuevo, que es 100% compatible. Produce la nube de puntos densa
+(~300k) que GLOMAP habría dejado, con las mismas poses optimizadas.
 """
 import shutil
 import subprocess
@@ -14,7 +15,6 @@ import pycolmap
 
 ROOT = Path.home() / "dko-3dgs"
 PY = str(ROOT / "gaussian-splatting" / "env" / "bin" / "python")
-GLOMAP = str(Path.home() / "glomap-env" / "bin" / "glomap")
 MAX_TRAIN_IMAGES = 500
 ITERATIONS = 30000
 MODEL_DIR = ROOT / "output" / "dko3d_full"
@@ -27,39 +27,29 @@ def stamp(msg):
 
 
 inp = ROOT / "data" / "input"
-# GLOMAP de conda-forge vendorea un COLMAP con esquema de db distinto
-# (user_version 3900): database_glomap.db es la migración de database.db
-# a ese esquema (mismas tablas de datos, layout de rigs/frames anterior)
-db = ROOT / "hloc_out" / "sfm" / "database_glomap.db"
-if not db.exists():
-    db = ROOT / "hloc_out" / "sfm" / "database.db"
-assert db.exists(), f"no existe {db}"
-
-# 1. GLOMAP mapper global
-stamp("1/4 GLOMAP mapper global")
+db = ROOT / "hloc_out" / "sfm" / "database.db"  # la original, esquema nuevo
 glomap_out = ROOT / "hloc_out" / "glomap"
-if glomap_out.exists():
-    shutil.rmtree(glomap_out)
-# skip_retriangulation: crashea con nuestra db migrada (frames/rigs vacíos)
-# y es opcional — las poses ya quedan optimizadas por el bundle adjustment
-r = subprocess.run([GLOMAP, "mapper",
-                    "--database_path", str(db),
-                    "--image_path", str(inp),
-                    "--output_path", str(glomap_out),
-                    "--skip_retriangulation", "1"])
-if r.returncode:
-    sys.exit(f"glomap falló con código {r.returncode}")
 
 models = [d for d in glomap_out.iterdir() if d.is_dir() and (d / "images.bin").exists()]
-assert models, "glomap no produjo ningún modelo"
+assert models, "no hay modelo GLOMAP"
 sfm = max(models, key=lambda d: pycolmap.Reconstruction(str(d)).num_reg_images())
+
+# 1. Retriangular todos los tracks con las poses ya optimizadas por GLOMAP
+stamp("1/4 retriangulación (pycolmap.triangulate_points)")
+rec = pycolmap.Reconstruction(str(sfm))
+print(f"modelo GLOMAP ({sfm.name}): {rec.num_reg_images()} registradas, "
+      f"{rec.num_points3D()} puntos antes de retriangular", flush=True)
+
+sfm_tri = ROOT / "hloc_out" / "glomap_tri"
+if sfm_tri.exists():
+    shutil.rmtree(sfm_tri)
+sfm_tri.mkdir()
+rec = pycolmap.triangulate_points(rec, db, inp, sfm_tri, clear_points=True)
+print(f"retriangulado: {rec.num_points3D()} puntos 3D", flush=True)
 
 # 2. Submuestrear cámaras para entrenamiento
 stamp("2/4 filtrar modelo a MAX_TRAIN_IMAGES cámaras")
-rec = pycolmap.Reconstruction(str(sfm))
 reg = sorted(rec.reg_image_ids())
-print(f"modelo GLOMAP ({sfm.name}): {len(reg)} registradas, {rec.num_points3D()} puntos", flush=True)
-
 step = max(1, len(reg) // MAX_TRAIN_IMAGES)
 keep = set(reg[::step])
 for iid in reg:
@@ -73,7 +63,7 @@ sfm_train.mkdir()
 rec.write(str(sfm_train))
 print(f"set de entrenamiento: {len(keep)} cámaras (1 de cada {step})", flush=True)
 
-# 3. Undistort al layout 3DGS + nube de puntos del modelo completo
+# 3. Undistort al layout 3DGS + nube de puntos del modelo retriangulado completo
 stamp("3/4 undistort + layout 3DGS")
 data = ROOT / "data"
 for d in (data / "images", data / "sparse", data / "stereo", data / "distorted"):
@@ -91,8 +81,8 @@ sparse0.mkdir(parents=True, exist_ok=True)
 for f in (data / "sparse").iterdir():
     if f.is_file():
         shutil.move(str(f), sparse0 / f.name)
-# 3DGS solo lee xyz/rgb de points3D.bin: usar la nube del modelo COMPLETO
-shutil.copy(sfm / "points3D.bin", sparse0 / "points3D.bin")
+# 3DGS solo lee xyz/rgb de points3D.bin: usar la nube retriangulada COMPLETA
+shutil.copy(sfm_tri / "points3D.bin", sparse0 / "points3D.bin")
 
 # 4. Entrenar
 stamp(f"4/4 entrenamiento 3DGS ({ITERATIONS} iters, -r 2, data en RAM)")
