@@ -34,17 +34,42 @@ models = [d for d in glomap_out.iterdir() if d.is_dir() and (d / "images.bin").e
 assert models, "no hay modelo GLOMAP"
 sfm = max(models, key=lambda d: pycolmap.Reconstruction(str(d)).num_reg_images())
 
-# 1. Retriangular todos los tracks con las poses ya optimizadas por GLOMAP
-stamp("1/4 retriangulación (pycolmap.triangulate_points)")
+# 1. Retriangular todos los tracks con las poses ya optimizadas por GLOMAP.
+#    Vía hloc.triangulation.main: crea una db NUEVA desde el propio modelo
+#    (frames consistentes por construcción — triangulate_points directo choca
+#    con el mismo check de frames que la retriangulación interna de GLOMAP).
+stamp("1/5 retriangulación (hloc.triangulation sobre el modelo GLOMAP)")
+from hloc import triangulation  # noqa: E402
+
 rec = pycolmap.Reconstruction(str(sfm))
 print(f"modelo GLOMAP ({sfm.name}): {rec.num_reg_images()} registradas, "
       f"{rec.num_points3D()} puntos antes de retriangular", flush=True)
 
+out = ROOT / "hloc_out"
+
+# pairs.txt tiene los 23916 nombres; la db creada desde el modelo solo conoce
+# las imágenes registradas -> filtrar pares a registradas-con-registradas
+reg_names = {rec.image(i).name for i in rec.reg_image_ids()}
+pairs_tri = out / "pairs_tri.txt"
+kept_pairs = []
+for line in (out / "pairs.txt").read_text().splitlines():
+    parts = line.split()
+    if len(parts) == 2 and parts[0] in reg_names and parts[1] in reg_names:
+        kept_pairs.append(line)
+pairs_tri.write_text("\n".join(kept_pairs) + "\n")
+print(f"pares filtrados: {len(kept_pairs)} (solo imágenes registradas)", flush=True)
+
 sfm_tri = ROOT / "hloc_out" / "glomap_tri"
 if sfm_tri.exists():
     shutil.rmtree(sfm_tri)
-sfm_tri.mkdir()
-rec = pycolmap.triangulate_points(rec, db, inp, sfm_tri, clear_points=True)
+rec = triangulation.main(
+    sfm_tri,
+    sfm,
+    inp,
+    pairs_tri,
+    out / "feats-aliked-n16.h5",
+    out / "feats-aliked-n16_matches-aliked-lightglue_pairs.h5",
+)
 print(f"retriangulado: {rec.num_points3D()} puntos 3D", flush=True)
 
 # 2. Bundle adjustment global post-retriangulación (mismo pulido que hace
