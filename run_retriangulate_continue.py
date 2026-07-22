@@ -47,8 +47,18 @@ sfm_tri.mkdir()
 rec = pycolmap.triangulate_points(rec, db, inp, sfm_tri, clear_points=True)
 print(f"retriangulado: {rec.num_points3D()} puntos 3D", flush=True)
 
-# 2. Submuestrear cámaras para entrenamiento
-stamp("2/4 filtrar modelo a MAX_TRAIN_IMAGES cámaras")
+# 2. Bundle adjustment global post-retriangulación (mismo pulido que hace
+#    GLOMAP internamente después de retriangular)
+stamp("2/5 bundle adjustment global post-retriangulación")
+ba_opts = pycolmap.BundleAdjustmentOptions()
+ba_opts.print_summary = True
+pycolmap.bundle_adjustment(rec, ba_opts)
+rec.write(str(sfm_tri))
+print(f"BA hecho: {rec.num_points3D()} puntos, "
+      f"error de reproyección medio {rec.compute_mean_reprojection_error():.3f}px", flush=True)
+
+# 3. Submuestrear cámaras para entrenamiento
+stamp("3/5 filtrar modelo a MAX_TRAIN_IMAGES cámaras")
 reg = sorted(rec.reg_image_ids())
 step = max(1, len(reg) // MAX_TRAIN_IMAGES)
 keep = set(reg[::step])
@@ -64,7 +74,7 @@ rec.write(str(sfm_train))
 print(f"set de entrenamiento: {len(keep)} cámaras (1 de cada {step})", flush=True)
 
 # 3. Undistort al layout 3DGS + nube de puntos del modelo retriangulado completo
-stamp("3/4 undistort + layout 3DGS")
+stamp("4/5 undistort + layout 3DGS")
 data = ROOT / "data"
 for d in (data / "images", data / "sparse", data / "stereo", data / "distorted"):
     if d.exists():
@@ -85,7 +95,7 @@ for f in (data / "sparse").iterdir():
 shutil.copy(sfm_tri / "points3D.bin", sparse0 / "points3D.bin")
 
 # 4. Entrenar
-stamp(f"4/4 entrenamiento 3DGS ({ITERATIONS} iters, -r 2, data en RAM)")
+stamp(f"5/5 entrenamiento 3DGS ({ITERATIONS} iters, -r 2, data en RAM)")
 r = subprocess.run(
     [PY, "train.py", "-s", str(data), "-m", str(MODEL_DIR),
      "-r", "2", "--data_device", "cpu",
