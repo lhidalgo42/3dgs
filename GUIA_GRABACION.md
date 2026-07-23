@@ -7,6 +7,12 @@ pie de la letra es la diferencia entre un modelo perfecto y uno inservible.
 
 ## 1. Configuración de la cámara (una sola vez, antes de grabar)
 
+**Regla de oro para ambos casos: TODO en manual y bloqueado.** Nada en "auto".
+Cada parámetro automático (foco, exposición, balance) cambia durante la
+grabación y el sistema 3D asume una cámara de parámetros fijos.
+
+### Caso A — iPhone / teléfono
+
 Usar la app **Blackmagic Camera** (gratis, iPhone/Android) — NO la cámara nativa.
 
 | Ajuste | Valor |
@@ -21,11 +27,36 @@ Usar la app **Blackmagic Camera** (gratis, iPhone/Android) — NO la cámara nat
 | ISO | Manual, el que dé buena exposición (típico 200–800) |
 | Balance de blancos | Fijo (~4500–5000 K) |
 
-**Regla de oro: TODO en manual y bloqueado.** Nada en "auto".
+### Caso B — Cámara profesional (mirrorless / cine)
 
-Verificación rápida antes de grabar en serio: grabar 10 segundos, pausar el
-video en la app y verificar que un fotograma congelado se vea **nítido**
-(sin barrido). Si se ve movido, bajar la velocidad al caminar.
+| Ajuste | Valor |
+|---|---|
+| Resolución / fps | 4K (UHD) a **30 o 60 fps** |
+| Códec / perfil | H.264/HEVC 8-bit 4:2:0 estándar. Perfil de color **Rec.709 normal** — NADA de S-Log/V-Log/HLG/RAW (el sistema necesita gamma estándar, no material para gradear) |
+| Estabilización | **TODA apagada**: IBIS (del cuerpo) + OIS (del lente) + digital |
+| Lente | **Focal fija** durante todo el video: prime gran angular o zoom fijado en el extremo ancho (16–24 mm equivalente). NO zoomear jamás mientras se graba |
+| Enfoque | **Manual, fijo** a ~2–3 m. Desactivar AF continuo. Si el lente tiene "focus breathing compensation", apagarla |
+| Obturación | **1/100 fija** (red de 50 Hz — nunca 1/60 ni 1/125). Ignorar la regla cinematográfica de 180° — aquí queremos frames congelados, no motion blur bonito |
+| Apertura | Fija, **f/4–f/5.6** (profundidad de campo amplia; nada de f/1.8 con fondos desenfocados) |
+| ISO | Manual, fijo, el que cierre la exposición (el ruido de ISO 1600 de un sensor grande es aceptable; el blur no) |
+| Balance de blancos | Fijo en Kelvin (~4500–5000 K), no AWB |
+| Audio | Irrelevante — puede ir apagado |
+
+Notas para el caso B:
+- Un sensor grande da mejor nitidez y menos ruido que un teléfono — es la
+  mejor opción si el operador respeta la técnica de la sección 2.
+- Peso: grabar a pulso firme con correa/rig de dos manos. NO usar gimbal con
+  modo "follow" agresivo (suaviza rotaciones de forma no física); un gimbal
+  en modo lock/estático suave es aceptable pero innecesario si se camina lento.
+- Si la cámara ofrece obturador electrónico con rolling shutter fuerte,
+  preferir el modo de lectura rápida o el obturador mecánico.
+
+### Verificación rápida (ambos casos)
+
+Antes de grabar en serio: grabar 10 segundos caminando, pausar el video y
+verificar que un fotograma congelado se vea **nítido** (sin barrido). Si se
+ve movido, bajar la velocidad al caminar o abrir más la obturación no — la
+obturación no se toca: caminar más lento.
 
 ## 2. Técnica de grabación (lo más importante)
 
